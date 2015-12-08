@@ -1,7 +1,8 @@
 function [dataSweepVals,Matdata,zHeader,dataProps,dataTimes,dataTemps] = formatLIData2Mat(tdmsData)
-%format complicated struct in easy to use matlab array
+%format LI data collected versus x Data collected with a different sample
+%rate
+% This prepares the data for a later surface plot
 
-%use horzcat to avoid for loops
 sweeps=struct2cell(tdmsData);
 dataProps=sweeps{1};
 % find broken file
@@ -35,8 +36,12 @@ min_points=1e6;
 ind=1;
 while 1 %Go through the Lock-In Demodulators
     loc=find(ismember(zHeader,strcat('LI',num2str(ind),'_timestamp')));
-    if loc
+    if loc && ~isempty(sweeps(1).(zHeader{loc}).data)
         for indi=1:sweepslen
+            % Remove trailing zeros for legacy data
+            sweeps(indi).(zHeader{loc}).data(find(sweeps(indi).(zHeader{loc}).data,1,'last')+1:end)=[];
+            sweeps(indi).(strcat('LI',num2str(ind),'_X')).data(find(sweeps(indi).(strcat('LI',num2str(ind),'_X')).data,1,'last')+1:end)=[];
+            sweeps(indi).(strcat('LI',num2str(ind),'_Y')).data(find(sweeps(indi).(strcat('LI',num2str(ind),'_Y')).data,1,'last')+1:end)=[];
             % Substract first value to start time at beginning of
             % measurement
             tmp=sweeps(indi).(zHeader{loc}).data-sweeps(indi).(zHeader{loc}).data(1);
@@ -51,10 +56,6 @@ while 1 %Go through the Lock-In Demodulators
 %                 sweeps(indi).(strcat('LI',num2str(ind),'_R')).data(indj)=mean(Rtmp(find(tmp>sweeps(indi).B_timestamp.data(indj)-0.5*sp & tmp<sweeps(indi).B_timestamp.data(indj)+0.5*sp)));
 %                 sweeps(indi).(strcat('LI',num2str(ind),'_Theta')).data(indj)=mean(Thtmp(find(tmp>sweeps(indi).B_timestamp.data(indj)-0.5*sp & tmp<sweeps(indi).B_timestamp.data(indj)+0.5*sp)));
 %             end
-            points=length(sweeps(indi).(strcat('LI',num2str(ind),'_R')).data);
-            if points<min_points
-                min_points=points;
-            end
         end
     else
         DemodNumber=ind-1;
@@ -67,6 +68,9 @@ ind=1;
 while 1 %Go through the Lock-In AuxIns
     loc=find(ismember(zHeader,strcat('AuxIn_',num2str(ind-1))));
     if loc
+        for indi=1:sweepslen
+            sweeps(indi).(strcat('AuxIn_',num2str(ind-1))).data(find(sweeps(indi).(strcat('AuxIn_',num2str(ind-1))).data,1,'last')+1:end)=[];
+        end
     else
         AuxNumber=ind-1;
         break
@@ -86,8 +90,12 @@ if sw0
         while swtmp
             lastind=length(sweeps(ind).B_sweep.data);
             sweeps(ind).B_sweep.Props.(strcat('Timestamp',num2str(indi)))=datetime(sweeps(ind).(zHeader{swtmp}).Props.Timestamp,'InputFormat','dd-MMM-y HH:mm:ss:SSS');
-            sweeps(ind).B_sweep.data=[sweeps(ind).B_sweep.data,sweeps(ind).(zHeader{swtmp}).data];
-            
+            for indj=2:length(sweeps(ind).(zHeader{swtmp}).data)
+                if abs(sweeps(ind).(zHeader{swtmp}).data(indj)-sweeps(ind).(zHeader{swtmp}).data(indj-1))>0.05
+                    sweeps(ind).(zHeader{swtmp}).data(indj)=mean([sweeps(ind).(zHeader{swtmp}).data(indj+1),sweeps(ind).(zHeader{swtmp}).data(indj-1)]);
+                end
+            end
+            sweeps(ind).B_sweep.data=[sweeps(ind).B_sweep.data,sweeps(ind).(zHeader{swtmp}).data];  
             indi=indi+1;
             swtmp=find(ismember(zHeader,strcat('Sweep',num2str(indi))));
         end
@@ -114,7 +122,7 @@ if Freq
     xtHeader='THz_time';
     for ind=1:sweepslen
         sweeps(ind).(xHeader).data=[sweeps(ind).Frequency__GHz__up.data,sweeps(ind).Frequency__GHz__down.data];
-        if (dataProps.XCaseName=='IPS120 B-Sweep' & ind~=1)
+        if (strcmp(dataProps.XCaseName,'IPS120 B-Sweep') & ind~=1)
             sweeps(ind).(xtHeader).data=30+(dataProps.Sweep_Step./dataProps.XCaseNumParSweep_rate__T_min_)*60+(1:length(sweeps(ind).(xHeader).data)).*(dataProps.YCaseNumParTHz_Integration_time__ms_+5).*0.001;
         else
             sweeps(ind).(xtHeader).data=30+(1:length(sweeps(ind).(xHeader).data)).*(dataProps.YCaseNumParTHz_Integration_time__ms_+5).*0.001;
@@ -124,34 +132,60 @@ end
 clear Freq
 
 clear zHeader
+min_points = length(sweeps(1).(xtHeader).data);
+minsweep=1;
+for ind = 2:sweepslen
+    tmp = length(sweeps(ind).(xtHeader).data);
+    if (tmp<min_points)
+      min_points = tmp;
+      minsweep=ind;
+    end
+end
+clear tmp
 Matdata=nan(sweepslen,min_points,2*DemodNumber+1+AuxNumber);
 for ind = 1:sweepslen
-    Matdata(ind,:,1)=interp1(sweeps(ind).(xtHeader).data,sweeps(ind).(xHeader).data,sweeps(ind).LI1_timestamp.data(1:min_points));
+    Matdata(ind,:,1)=interp1(sweeps(ind).(xtHeader).data,sweeps(ind).(xHeader).data,sweeps(minsweep).(xtHeader).data);
 end
 zHeader{1}=xHeader;
 for ind=1:DemodNumber
-    tmp=horzcat(sweeps(:).(strcat('LI',num2str(ind),'_R')));
     for i=1:sweepslen
-        tmp1=tmp(i).data;
-        tmp(i).data=tmp1(1,1:min_points);
+        Matdata(i,:,ind*2)=interp1(sweeps(i).(strcat('LI',num2str(ind),'_timestamp')).data,sweeps(i).(strcat('LI',num2str(ind),'_R')).data,sweeps(minsweep).(xtHeader).data);
     end;
-    Matdata(:,:,ind*2)=vertcat(tmp.data);
     zHeader{ind*2}=strcat('LI',num2str(ind),'_R');
-    tmp=horzcat(sweeps(:).(strcat('LI',num2str(ind),'_Theta')));
     for i=1:sweepslen
-        tmp1=tmp(i).data;
-        tmp(i).data=tmp1(1,1:min_points);
+        Matdata(i,:,ind*2+1)=interp1(sweeps(i).(strcat('LI',num2str(ind),'_timestamp')).data,sweeps(i).(strcat('LI',num2str(ind),'_Theta')).data,sweeps(minsweep).(xtHeader).data);
     end;
-    Matdata(:,:,ind*2+1)=vertcat(tmp.data);
     zHeader{ind*2+1}=strcat('LI',num2str(ind),'_Theta');
 end
 for ind=1:AuxNumber
-    tmp=horzcat(sweeps(:).(strcat('AuxIn_',num2str(ind-1))));
     for i=1:sweepslen
-        tmp1=tmp(i).data;
-        tmp(i).data=tmp1(1,1:min_points);
+        Matdata(i,:,2*DemodNumber+1+ind)=interp1(sweeps(i).LI1_timestamp.data,sweeps(i).(strcat('AuxIn_',num2str(ind-1))).data,sweeps(minsweep).(xtHeader).data);
     end;
-    Matdata(:,:,2*DemodNumber+1+ind)=vertcat(tmp.data);
     zHeader{2*DemodNumber+1+ind}=strcat('AuxIn_',num2str(ind-1));
 end
+
+% clear zHeader
+% min_points=length(sweeps(1).B_timestamp.data);
+% Matdata=nan(sweepslen,min_points,2*DemodNumber+1+AuxNumber);
+% for ind = 1:sweepslen
+%     Matdata(ind,:,1)=interp1(sweeps(ind).(xtHeader).data,sweeps(ind).(xHeader).data,sweeps(1).B_timestamp.data);
+% end
+% zHeader{1}=xHeader;
+% for ind=1:DemodNumber
+%     for i=1:sweepslen
+%         Matdata(i,:,ind*2)=interp1(sweeps(i).(strcat('LI',num2str(ind),'_timestamp')).data,sweeps(i).(strcat('LI',num2str(ind),'_R')).data,sweeps(1).B_timestamp.data);
+%     end;
+%     zHeader{ind*2}=strcat('LI',num2str(ind),'_R');
+%     for i=1:sweepslen
+%         Matdata(i,:,ind*2+1)=interp1(sweeps(i).(strcat('LI',num2str(ind),'_timestamp')).data,sweeps(i).(strcat('LI',num2str(ind),'_Theta')).data,sweeps(1).B_timestamp.data);
+%     end;
+%     zHeader{ind*2+1}=strcat('LI',num2str(ind),'_Theta');
+% end
+% for ind=1:AuxNumber
+%     for i=1:sweepslen
+%         Matdata(i,:,2*DemodNumber+1+ind)=interp1(sweeps(i).LI1_timestamp.data,sweeps(i).(strcat('AuxIn_',num2str(ind-1))),sweeps(1).B_timestamp.data);
+%     end;
+%     zHeader{2*DemodNumber+1+ind}=strcat('AuxIn_',num2str(ind-1));
+% end
+
     

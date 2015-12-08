@@ -54,14 +54,16 @@ end
 
 %ACTUAL FILE READING
 %==============================================================
-
-sendStatus(handles,'Loading to Mem...');
+try
+    sendStatus(handles,'Loading to Mem...');
+end
 [temp,metaStruct] = TDMS_readTDMSFile(filePath,readOptions{:});
 
 %POST PROCESSING
 %==============================================================
-
-sendStatus(handles,'Putting in stuct...');
+try
+    sendStatus(handles,'Putting in stuct...');
+end
 switch structVersion
     case 1
         output = TDMS_dataToGroupChanStruct_v1(temp,structConvOptions{:});
