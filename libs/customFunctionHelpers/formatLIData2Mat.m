@@ -123,9 +123,9 @@ if Freq
     for ind=1:sweepslen
         sweeps(ind).(xHeader).data=[sweeps(ind).Frequency__GHz__up.data,sweeps(ind).Frequency__GHz__down.data];
         if (strcmp(dataProps.XCaseName,'IPS120 B-Sweep') & ind~=1)
-            sweeps(ind).(xtHeader).data=30+(dataProps.Sweep_Step./dataProps.XCaseNumParSweep_rate__T_min_)*60+(1:length(sweeps(ind).(xHeader).data)).*(dataProps.YCaseNumParTHz_Integration_time__ms_+5).*0.001;
+            sweeps(ind).(xtHeader).data=30+(dataProps.Sweep_Step./dataProps.XCaseNumParSweep_rate__T_min_)*60+(1:length(sweeps(ind).(xHeader).data)).*(dataProps.YCaseNumParTHz_Integration_time__ms_).*0.001;
         else
-            sweeps(ind).(xtHeader).data=30+(1:length(sweeps(ind).(xHeader).data)).*(dataProps.YCaseNumParTHz_Integration_time__ms_+5).*0.001;
+            sweeps(ind).(xtHeader).data=linspace(0,max(sweeps(ind).LI1_timestamp.data),length(sweeps(ind).(xHeader).data));
         end
     end
 end

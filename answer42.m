@@ -50,8 +50,6 @@ if ~isdeployed
     %rootPath='/media/julian/AGScheer/jbraun/Software/WMI/answer43/libs/';
     rootPath=fullfile(pwd,'libs',filesep);
     subscriptRoot='/media/julian/AGScheer/jbraun/Software/WMI/answer43/subscripts';
-    %rootPath='H:\MATLAB\answer42\libs';
-    %subscriptRoot='H:\MATLAB\answer42\subscripts';
     if isempty(strfind(path,rootPath))
         addpath(genpath(rootPath));
     end;
@@ -63,8 +61,8 @@ end;
 lib = populatelib(subscriptRoot);
 
 %get actual caseList (deprecated...)
-%xCaseRoot='/media/julian/e0b48436-b77c-4909-bcad-e069a23c89ac/home/julian/Dokumente/Software/WMI/DeepThought/case folder/X Cases';
-%yCaseRoot='/media/julian/e0b48436-b77c-4909-bcad-e069a23c89ac/home/julian/Dokumente/Software/WMI/DeepThought/case folder/Y Cases';
+xCaseRoot='/media/julian/e0b48436-b77c-4909-bcad-e069a23c89ac/home/julian/Dokumente/Software/WMI/DeepThought/case folder/X Cases';
+yCaseRoot='/media/julian/e0b48436-b77c-4909-bcad-e069a23c89ac/home/julian/Dokumente/Software/WMI/DeepThought/case folder/Y Cases';
 try
     tmp=load('defaults.mat');
     startfolder=tmp.pathname;
